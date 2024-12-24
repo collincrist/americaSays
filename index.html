@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"="width=device-width, initial-scale=1.0">
+    <title>America Says Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            background: radial-gradient(circle, #003399, #000a4d);
+            color: #fff;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        #game-container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+            background: rgba(0, 0, 128, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+        }
+        #category {
+            font-size: 2.2em;
+            font-weight: bold;
+            background: #c00000;
+            padding: 10px;
+            border-radius: 10px;
+            color: #fff;
+            display: inline-block;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        #timer {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #fff;
+            background: #ff0000;
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin: 15px;
+        }
+        #team-turn {
+            font-size: 1.8em;
+            margin: 10px 0;
+            color: yellow;
+            font-weight: bold;
+        }
+        #answers {
+            display: grid;
+            grid-template-areas: 
+                ". top1 top2 ."
+                ". center . ."
+                "bottom1 bottom2 bottom3 .";
+            gap: 40px 20px;
+            justify-content: center;
+            align-items: center;
+            margin: 40px auto;
+        }
+        .hidden-answer {
+            font-size: 2em;
+            color: #ff0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            text-align: center;
+        }
+        .hidden-answer:hover {
+            transform: scale(1.1);
+        }
+        .hidden-answer.revealed {
+            color: #4CAF50;
+            cursor: default;
+        }
+        .hidden-answer.center {
+            font-size: 2.8em;
+            grid-area: center;
+        }
+        .hidden-answer.top1 { grid-area: top1; }
+        .hidden-answer.top2 { grid-area: top2; }
+        .hidden-answer.bottom1 { grid-area: bottom1; }
+        .hidden-answer.bottom2 { grid-area: bottom2; }
+        .hidden-answer.bottom3 { grid-area: bottom3; }
+        button {
+            font-size: 1.5em;
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #3c943e;
+        }
+        #score {
+            font-size: 1.8em;
+            margin: 20px;
+        }
+        #next-category-btn, #next-team-btn, #next-bonus-btn {
+            display: none;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>America Says Game</h1>
+    <nav>
+        <a href="index.html">Home</a> | <a href="rules.html">Rules</a> | <a href="Bonus.html">Bonus</a>
+    </nav>
+    <div id="game-container">
+        <div id="category"></div>
+        <div id="team-turn">Crist Team's Turn</div>
+        <div id="timer">:30</div>
+        <div id="answers"></div>
+        <p id="score">Crist Team: 0 | Robertson Team: 0</p>
+        <button id="next-category-btn" onclick="startNextCategory()">Start Next Category</button>
+        <button id="next-team-btn" onclick="startNextTeam()">Start Other Team's Turn</button>
+        <button id="show-answers-btn" onclick="showAnswersAndStartTimer()" style="display: block; margin: 20px auto; padding: 10px 20px; font-size: 1.2em; background-color: #0066cc; color: #fff; border: none; border-radius: 5px; cursor: pointer;">
+            Begin!
+        </button>
+    </div>
+
+    <script>
+        const categories = [
+            { question: "My child has her heart set on being a ____ when she grows up", answers: ["Veterinarian", "Firefighter", "Ballerina", "Doctor", "Astronaut", "Teacher", "Lawyer"] },
+            { question: "A word that often comes before 'eye' is ___", answers: ["Bulls", "Pink", "Eagle", "Black", "Private", "Red", "Hawk"] },
+            { question: "When I’m craving a late night snack, I reach for ____", answers: ["Chocolate", "Popcorn", "Grapes", "Ice Cream", "Pizza", "Yoghurt", "Chips"] },
+            { question: "The other day I saw a ___ crawling in my flower bed", answers: ["Caterpillar", "Ladybug", "Spider", "Worm", "Snake", "Beetle", "Ant"] },
+            { question: "When I think of places that are underground, I think of ____", answers: ["Wine Cellar", "Basement", "Tunnel", "Subway", "Tomb", "Cave", "Sewer"] },
+            { question: "Women know more about ___ than men", answers: ["Everything", "Child Birth", "Fashion", "Makeup", "Kids", "Sex", "Life"] },
+        ];
+
+        let teamScores = [0, 0]; // 0 = Crist Team, 1 = Robertson Team
+        let currentCategoryIndex = 0;
+        let currentTeam = 0; // Starting team
+        let revealedAnswers = new Set();
+        let isStealing = false;
+        let timerInterval;
+
+        const categoryElement = document.getElementById("category");
+        const teamTurnElement = document.getElementById("team-turn");
+        const timerElement = document.getElementById("timer");
+        const answersElement = document.getElementById("answers");
+        const scoreElement = document.getElementById("score");
+        const nextCategoryBtn = document.getElementById("next-category-btn");
+        const nextTeamBtn = document.getElementById("next-team-btn");
+
+        function getPointsPerAnswer() {
+            if (currentCategoryIndex < 2) return 100; // Rounds 1 & 2
+            if (currentCategoryIndex < 4) return 200; // Rounds 3 & 4
+            return 300; // Rounds 5 & 6
+        }
+
+        function getBonusPoints() {
+            if (currentCategoryIndex < 2) return 1000; // Rounds 1 & 2
+            if (currentCategoryIndex < 4) return 2000; // Rounds 3 & 4
+            return 3000; // Rounds 5 & 6
+        }
+
+        function startCategory() {
+            resetTimer();
+            revealedAnswers.clear();
+            nextCategoryBtn.style.display = "none";
+            nextTeamBtn.style.display = "none";
+            answersElement.innerHTML = "";
+            document.getElementById("show-answers-btn").style.display = "block";
+
+            const category = categories[currentCategoryIndex];
+            categoryElement.textContent = `Category ${currentCategoryIndex + 1}: ${category.question}`;
+            isStealing = false;
+
+            currentTeam = (currentCategoryIndex % 2 === 0) ? 0 : 1; // Crist starts odd categories, Robertson even
+            updateTeamTurnDisplay();
+        }
+
+        function renderAnswers(answers) {
+            answers.forEach((answer, index) => {
+                const element = document.createElement("div");
+                const words = answer.split(" ");
+                if (words.length > 1) {
+                    element.textContent = `${words[0][0]}${"_".repeat(words[0].length - 1)} ${words[1][0]}${"_".repeat(words[1].length - 1)}`;
+                } else {
+                    element.textContent = `${answer[0]}${"_".repeat(answer.length - 1)}`;
+                }
+                element.className = "hidden-answer";
+
+                if (index === 0) element.classList.add("center");
+                else if (index === 1) element.classList.add("top1");
+                else if (index === 2) element.classList.add("top2");
+                else if (index === 3) element.classList.add("bottom1");
+                else if (index === 4) element.classList.add("bottom2");
+                else if (index === 5) element.classList.add("bottom3");
+
+                element.onclick = () => revealAnswer(answer, element);
+                answersElement.appendChild(element);
+            });
+        }
+
+        function revealAnswer(answer, element) {
+            if (!revealedAnswers.has(answer)) {
+                revealedAnswers.add(answer);
+                element.textContent = answer;
+                element.classList.add("revealed");
+
+                teamScores[currentTeam] += getPointsPerAnswer();
+                updateScores();
+
+                if (revealedAnswers.size === categories[currentCategoryIndex].answers.length) {
+                    clearInterval(timerInterval);
+                    if (!isStealing) {
+                        teamScores[currentTeam] += getBonusPoints(); // Add bonus points only for the original team
+                    }
+                    updateScores();
+                    nextCategoryBtn.style.display = "block";
+                }
+            }
+        }
+
+        function updateScores() {
+            scoreElement.textContent = `Crist Team: ${teamScores[0]} | Robertson Team: ${teamScores[1]}`;
+        }
+
+        function startTimer() {
+            let timer = 30;
+            timerElement.textContent = `:${timer}`;
+            timerInterval = setInterval(() => {
+                timer--;
+                timerElement.textContent = `:${timer}`;
+                if (timer === 0) {
+                    clearInterval(timerInterval);
+                    if (!isStealing) {
+                        isStealing = true;
+                        currentTeam = (currentTeam === 0) ? 1 : 0; // Switch to opposite team for stealing
+                        updateTeamTurnDisplay();
+                        nextTeamBtn.style.display = "block";
+                    } else {
+                        nextCategoryBtn.style.display = "block";
+                    }
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerElement.textContent = ":30";
+        }
+
+        function startNextCategory() {
+            currentCategoryIndex++;
+            if (currentCategoryIndex >= categories.length) {
+                announceWinner();
+                return;
+            }
+            startCategory();
+        }
+
+        function announceWinner() {
+            const winningTeam = teamScores[0] > teamScores[1] ? "Crist Team" : "Robertson Team";
+            alert(`Congratulations, ${winningTeam} won. You get access to the bonus round!!!`);
+            localStorage.setItem('mainGameScores', JSON.stringify(teamScores));
+            window.location.href = 'bonus.html';
+        }
+
+        function startNextTeam() {
+            resetTimer();
+            if (isStealing) {
+                nextTeamBtn.style.display = "none";
+                startTimer();
+            }
+        }
+
+        function updateTeamTurnDisplay() {
+            const teamNames = ["Crist Team", "Robertson Team"];
+            teamTurnElement.textContent = `${teamNames[currentTeam]}'s Turn`;
+        }
+
+        function showAnswersAndStartTimer() {
+            document.getElementById("show-answers-btn").style.display = "none";
+            renderAnswers(categories[currentCategoryIndex].answers);
+            startTimer();
+        }
+
+        startCategory();
+    </script>
+</body>
+</html>
