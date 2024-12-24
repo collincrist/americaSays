@@ -51,7 +51,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 40px; /* Increase the gap between answer choices */
             margin: 40px auto;
         }
         .hidden-answer {
@@ -101,6 +101,17 @@
             display: none;
             margin: 20px auto;
         }
+        #pass-btn {
+            display: none;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 1.2em;
+            background-color: #ff0000;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -118,6 +129,7 @@
         <button id="show-answers-btn" onclick="showAnswersAndStartTimer()" style="display: block; margin: 20px auto; padding: 10px 20px; font-size: 1.2em; background-color: #0066cc; color: #fff; border: none; border-radius: 5px; cursor: pointer;">
             Begin!
         </button>
+        <button id="pass-btn" onclick="passQuestion()">Pass</button>
     </div>
 
     <script>
@@ -131,24 +143,20 @@
         let currentCategoryIndex = 0;
         let revealedAnswers = new Set();
         let timerInterval;
+        let totalTimer = 60;
+        let passedCategories = [];
 
         const categoryElement = document.getElementById("category");
         const timerElement = document.getElementById("timer");
         const answersElement = document.getElementById("answers");
         const nextCategoryBtn = document.getElementById("next-category-btn");
-
-        function getPointsPerAnswer() {
-            return 100; // Points per answer for bonus round
-        }
-
-        function getBonusPoints() {
-            return 500; // Bonus points for bonus round
-        }
+        const passBtn = document.getElementById("pass-btn");
 
         function startCategory() {
             resetTimer();
             revealedAnswers.clear();
             nextCategoryBtn.style.display = "none";
+            passBtn.style.display = "block";
             answersElement.innerHTML = "";
             document.getElementById("show-answers-btn").style.display = "block";
 
@@ -167,13 +175,6 @@
                 }
                 element.className = "hidden-answer";
 
-                if (index === 0) element.classList.add("center");
-                else if (index === 1) element.classList.add("top1");
-                else if (index === 2) element.classList.add("top2");
-                else if (index === 3) element.classList.add("bottom1");
-                else if (index === 4) element.classList.add("bottom2");
-                else if (index === 5) element.classList.add("bottom3");
-
                 element.onclick = () => revealAnswer(answer, element);
                 answersElement.appendChild(element);
             });
@@ -188,33 +189,40 @@
                 if (revealedAnswers.size === categories[currentCategoryIndex].answers.length) {
                     clearInterval(timerInterval);
                     nextCategoryBtn.style.display = "block";
+                    passBtn.style.display = "none";
                 }
             }
         }
 
         function startTimer() {
-            let timer = 30;
-            timerElement.textContent = `:${timer}`;
+            timerElement.textContent = `:${totalTimer}`;
             timerInterval = setInterval(() => {
-                timer--;
-                timerElement.textContent = `:${timer}`;
-                if (timer === 0) {
+                totalTimer--;
+                timerElement.textContent = `:${totalTimer}`;
+                if (totalTimer === 0) {
                     clearInterval(timerInterval);
                     nextCategoryBtn.style.display = "block";
+                    passBtn.style.display = "none";
                 }
             }, 1000);
         }
 
         function resetTimer() {
             clearInterval(timerInterval);
-            timerElement.textContent = ":30";
+            timerElement.textContent = `:${totalTimer}`;
         }
 
         function startNextCategory() {
             currentCategoryIndex++;
             if (currentCategoryIndex >= categories.length) {
-                alert("Bonus Round Over! Final scores will be displayed.");
-                return;
+                if (passedCategories.length > 0) {
+                    categories.push(...passedCategories);
+                    passedCategories = [];
+                    currentCategoryIndex = categories.length - passedCategories.length;
+                } else {
+                    alert("Bonus Round Over! Final scores will be displayed.");
+                    return;
+                }
             }
             startCategory();
         }
@@ -223,6 +231,14 @@
             document.getElementById("show-answers-btn").style.display = "none";
             renderAnswers(categories[currentCategoryIndex].answers);
             startTimer();
+        }
+
+        function passQuestion() {
+            passedCategories.push(categories[currentCategoryIndex]);
+            categories.splice(currentCategoryIndex, 1);
+            clearInterval(timerInterval);
+            nextCategoryBtn.style.display = "block";
+            passBtn.style.display = "none";
         }
 
         startCategory();
